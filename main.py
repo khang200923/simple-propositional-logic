@@ -22,7 +22,7 @@ class Term:
                 return term
             else:
                 return self
-        #What
+        # What
         raise ValueError("Impossible")
 
 @dataclass(frozen=True)
@@ -30,7 +30,9 @@ class Var(Term):
     """A variable."""
     value: int
     def __str__(self):
-        return "v{}".format(self.value)
+        if ord("a") <= self.value and self.value <= ord("z"):
+            return chr(self.value)
+        return f"v{self.value}"
 
 @dataclass(frozen=True)
 class Cont(Term):
@@ -44,14 +46,16 @@ class Imply(Term):
     premise: Term
     conclusion: Term
     def __str__(self):
-        return "({}) -> {}".format(str(self.premise), str(self.conclusion))
+        return f"({self.premise}) -> {self.conclusion}"
 
 @dataclass(frozen=True)
 class MetaVar(Term):
     """A metavariable. Represents any term."""
     value: int
     def __str__(self):
-        return "V{}".format(self.value)
+        if ord("A") <= self.value and self.value <= ord("Z"):
+            return chr(self.value)
+        return f"V{self.value}"
 
 def parse(term: str) -> Term:
     """
@@ -75,7 +79,7 @@ def parse(term: str) -> Term:
         return (Imply(a, b), els)
     res = chew(term)
     if res[1]:
-        raise ValueError("Redundant string: {}".format(res[1]))
+        raise ValueError(f"Redundant string: {res[1]}")
     return res[0]
 p = parse
 
@@ -109,8 +113,8 @@ class Proof:
     goal: Term
     inferences: List[Infer]
 
-    def verify(self) -> bool:
-        """Verifies proof if it follows syntax and actually deduces the goal."""
+    def statements(self) -> bool | None:
+        """Returns the statement the proof has included."""
         res = []
         for inf in self.inferences:
             if isinstance(inf, AxiomI):
@@ -121,15 +125,35 @@ class Proof:
                 res.append(ress)
             elif isinstance(inf, ModI):
                 if inf.premise >= len(res) or inf.implication >= len(res):
-                    return False
+                    return None
                 a = res[inf.implication]
                 b = res[inf.premise]
                 if not isinstance(a, Imply):
-                    return False
+                    return None
                 if a.premise != b:
-                    return False
+                    return None
                 res.append(a.conclusion)
             else:
-                #What
+                # What
                 raise ValueError("Impossible")
+        return res
+    def verify(self) -> bool:
+        """Verifies proof if it follows syntax and actually deduces the goal."""
+        res = self.statements()
+        if not res:
+            return False
         return self.goal in res
+
+    def __str__(self):
+        res = f"Goal is {self.goal}\nProof is:"
+        for i, (inf, st) in enumerate(zip(self.inferences, self.statements())):
+            res += f"\n{i}: {st} "
+            if isinstance(inf, AxiomI):
+                res += f"(Axiom {inf.index} {axioms[inf.index]}; terms A = {inf.terms[0]}, B = {inf.terms[1]}, C = {inf.terms[2]})"
+            elif isinstance(inf, ModI):
+                res += f"(Inferred from {inf.implication} using {inf.premise})"
+            else:
+                # What
+                raise ValueError("Impossible")
+        res += "\nQ.E.D."
+        return res
